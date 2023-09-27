@@ -9,9 +9,8 @@ import torch
 import torch.nn as nn
 
 from tqdm import tqdm
-from gnn_models_sag import GIN_Net2, ppi_model
+from gnn_models_sag import ppi_model
 from gnn_data import GNN_DATA
-from gnn_models_sag import GIN_Net2
 from utils import Metrictor_PPI, print_file
 parser = argparse.ArgumentParser(description='HIGH-PPI_model_training')
 
@@ -91,7 +90,7 @@ def test(model, graph, test_mask, device,batch, p_x_all, p_edge_all):
     batch_size = 64
 
     valid_steps = math.ceil(len(test_mask) / batch_size)
-    
+
     valid_pre_result_list = []
     valid_label_list = []
     true_prob_list = []
@@ -170,7 +169,7 @@ def main():
             node_vision_dict[ppi[0]] = 0
         if ppi[1] not in node_vision_dict.keys():
             node_vision_dict[ppi[1]] = 0
-    
+
     vision_num = 0
     unvision_num = 0
     for node in node_vision_dict:
@@ -208,27 +207,17 @@ def main():
 
     graph.to(device)
 
-
-
-
-
     p_x_all = torch.load(args.p_feat_matrix)
     # p_edge_all = np.load('/apdcephfs/share_1364275/kaithgao/edge_list_12.npy', allow_pickle=True)
     p_edge_all = np.load(args.p_adj_matrix, allow_pickle=True)
     p_x_all, x_num_index = multi2big_x(p_x_all)
-    # p_x_all = p_x_all[:,torch.arange(p_x_all.size(1))!=6] 
-    p_edge_all, edge_num_index = multi2big_edge(p_edge_all, x_num_index)
-
+    # p_x_all = p_x_all[:,torch.arange(p_x_all.size(1))!=6]
+    p_edge_all, _ = multi2big_edge(p_edge_all, x_num_index)
+    p_edge_all = p_edge_all - 1  # @NOTE: remove off-by-one error.
 
     batch = multi2big_batch(x_num_index)+1
 
-
-
-
-
-
-
     test(model, graph, graph.val_mask, device,batch, p_x_all, p_edge_all)
-    
+
 if __name__ == "__main__":
     main()
