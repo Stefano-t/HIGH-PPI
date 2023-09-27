@@ -36,38 +36,61 @@ torch.manual_seed(seed_num)
 torch.cuda.manual_seed(seed_num)
 
 def multi2big_x(x_ori):
-    x_cat = torch.zeros(1, 7)
-    x_num_index = torch.zeros(1553)
-    for i in range(1553):
+    """Transforms the input list of arrays into a single array. Second dim must match between all arrays.
+
+    Transfroms like (L, M, N) -> (L*M, N).
+    """
+    input_len = len(x_ori)
+    input_second_dim = x_ori[0].shape[1]
+    for elt in x_ori:
+        assert elt.shape[1] == input_second_dim, "Second dim doesn't match"
+
+    x_cat = torch.zeros(1, input_second_dim)
+    x_num_index = torch.zeros(input_len)
+    for i in range(input_len):
         x_now = torch.tensor(x_ori[i])
         x_num_index[i] = torch.tensor(x_now.size(0))
         x_cat = torch.cat((x_cat, x_now), 0)
     return x_cat[1:, :], x_num_index
 
 def multi2big_batch(x_num_index):
+    """Assigns an index to each consecutive index.
+
+    That is, index at position `x_num_index[i]` will generate a batch `x_num_index[i+1] - x_num_index[i]` of value `i`.
+    """
     num_sum = x_num_index.sum()
     num_sum = num_sum.int()
     batch = torch.zeros(num_sum)
     count = 1
-    for i in range(1,1553):
-        zj1 = x_num_index[:i]
-        zj11 = zj1.sum()
-        zj11 = zj11.int()
+    cumsum = x_num_index.cumsum(0, dtype=torch.int)
+    for i in range(1, len(x_num_index)):
+        zj11 = cumsum[i-1]
         zj22 = zj11 + x_num_index[i]
         zj22 = zj22.int()
         size1 = x_num_index[i]
         size1 = size1.int()
         tc = count * torch.ones(size1)
         batch[zj11:zj22] = tc
-        test = batch[zj11:zj22]
+        # test = batch[zj11:zj22]
         count = count + 1
     batch = batch.int()
     return batch
 
 def multi2big_edge(edge_ori, num_index):
-    edge_cat = torch.zeros(2, 1)
-    edge_num_index = torch.zeros(1553)
-    for i in range(1553):
+    """Transfroms the input list of edges into a single edge array.
+
+    Applies the transformation: (L, E, N) -> (N, L * E).
+    """
+    assert len(edge_ori) > 0
+    assert len(edge_ori[0]) > 0
+
+    edge_len = len(edge_ori[0][0])
+    edge_cat = torch.zeros(edge_len, 1)
+
+    offsets = num_index.cumsum(0)
+    input_len = len(edge_ori)
+    edge_num_index = torch.zeros(input_len)
+    for i in range(input_len):
         edge_index_p = edge_ori[i]
         edge_index_p = np.asarray(edge_index_p)
         edge_index_p = torch.tensor(edge_index_p.T)
@@ -75,8 +98,7 @@ def multi2big_edge(edge_ori, num_index):
         if i == 0:
             offset = 0
         else:
-            zj = torch.tensor(num_index[:i])
-            offset = zj.sum()
+            offset = offsets[i-1]
         edge_cat = torch.cat((edge_cat, edge_index_p + offset), 1)
     return edge_cat[:, 1:], edge_num_index
 
@@ -118,18 +140,14 @@ def train(batch, p_x_all, p_edge_all, model, graph, ppi_list, loss_fn, optimizer
 
         random.shuffle(graph.train_mask)
         random.shuffle(graph.train_mask_got)
+        assert len(graph.train_mask) == len(graph.train_mask_got)
 
         for step in range(steps):
-            if step == steps - 1:
-                if got:
-                    train_edge_id = graph.train_mask_got[step * batch_size:]
-                else:
-                    train_edge_id = graph.train_mask[step * batch_size:]
+            idx = step * batch_size
+            if got:
+                train_edge_id = graph.train_mask_got[idx : min(idx + batch_size, len(graph.train_mask_got))]
             else:
-                if got:
-                    train_edge_id = graph.train_mask_got[step * batch_size: step * batch_size + batch_size]
-                else:
-                    train_edge_id = graph.train_mask[step * batch_size: step * batch_size + batch_size]
+                train_edge_id = graph.train_mask[idx : min(idx + batch_size, len(graph.train_mask))]
 
             if got:
                 output = model(batch, p_x_all, p_edge_all, graph.edge_index_got, train_edge_id)
@@ -260,14 +278,12 @@ def main():
     p_x_all = torch.load(args.p_feat_matrix)
     p_edge_all = np.load(args.p_adj_matrix, allow_pickle=True)
     p_x_all, x_num_index = multi2big_x(p_x_all)
-    # p_x_all = p_x_all[:,torch.arange(p_x_all.size(1))!=6] 
-    p_edge_all, edge_num_index = multi2big_edge(p_edge_all, x_num_index)
+    # p_x_all = p_x_all[:,torch.arange(p_x_all.size(1))!=6]
+    p_edge_all, _ = multi2big_edge(p_edge_all, x_num_index)
+    p_edge_all = p_edge_all - 1  # @NOTE: avoid off-by-one error
 
 
     batch = multi2big_batch(x_num_index)+1
-
-
-
 
     print("train gnn, train_num: {}, valid_num: {}".format(len(graph.train_mask), len(graph.val_mask)))
 
@@ -297,11 +313,11 @@ def main():
     if not os.path.exists(save_path):
         os.mkdir(save_path)
 
-    time_stamp = time.strftime("%Y-%m-%d %H-%M-%S")
+    # time_stamp = time.strftime("%Y-%m-%d %H-%M-%S")
     save_path = os.path.join(save_path, "gnn_{}".format('training_seed_1'))
     result_file_path = os.path.join(save_path, "valid_results.txt")
     config_path = os.path.join(save_path, "config.txt")
-    os.mkdir(save_path)
+    # os.mkdir(save_path)
 
     summary_writer = SummaryWriter(save_path)
 
