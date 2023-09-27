@@ -1,117 +1,54 @@
 import numpy as np
 import os
 from tqdm import tqdm
-import math
 import argparse
-import re
-import requests
-import json
 from multiprocessing.pool import ThreadPool
+import torch
+from generate_utils import download_pdb, pdb_to_cm, pdb_to_x, PROTEIN_2_IDX_TABLE
 
-RCSB_URL = "https://files.rcsb.org/download/{}"
-ALPHAFOLD_URL = "https://alphafold.ebi.ac.uk/api/prediction/{}"
 
-parser = argparse.ArgumentParser(description='make_adj_set')
+# Define the arg parser.
+parser = argparse.ArgumentParser(description='Create adj list and feature map from proteins in the network.')
 parser.add_argument('--distance', default=None, type=float,
                     help="distance threshold")
+parser.add_argument("--ensp_uniprot", default="ensp_uniprot.txt", help="File where Ensp to Uniprot translatoin is stored")
+parser.add_argument("--protein_seq_file", default="protein.SHS27k.sequences.dictionary.pro3.tsv", help="File where to read protein sequences")
+parser.add_argument("--all_for_assign", default="all_assign.txt", help="File where to read 'all_for_assign' variable")
+parser.add_argument("--out_adj", default="edge_list_12.npy", help="Output file for the adj list")
+parser.add_argument("--out_feat", default="x_list_7.pt", help="Output file for the feature list")
+
 args = parser.parse_args()
 
-def dist(p1, p2):
-    dx = p1[0] - p2[0]
-    dy = p1[1] - p2[1]
-    dz = p1[2] - p2[2]
-    return math.sqrt(dx**2 + dy**2 + dz**2)
+# Translation table from ENSP to Uniprot format.
+ENSP_2_UNIPROT = {}
 
+breakpoint()
+# Parse the ensp_uniprot file and populate the translation table.
+with open(args.ensp_uniprot) as f:
+    # @TODO: change file format to something more manageable.
+    all_file = f.read()  # It's just a single line.
+    parts = all_file.split("', '")
+    for elt in parts:
+        e = f.read()
+        elt = elt.replace("'", "")  # Remove sporious quotes.
+        elt = elt.split("ENSP")
+        assert len(elt) == 2
+        # Get mapping
+        left, right = elt[1].split("\\t")
+        ENSP_2_UNIPROT[left] = right
 
-def read_atoms(file, chain=".", model=1):
-    _ = model  # @TODO: remove model
-    pattern = re.compile(chain)
-
-    # current_model = model
-    atoms = []
-    for line in file:
-        line = line.strip()
-        if line.startswith("ATOM"):
-            type = line[12:16].strip()
-            chain = line[21:22]
-            if type == "CA" and re.match(pattern, chain):
-                x = float(line[30:38].strip())
-                y = float(line[38:46].strip())
-                z = float(line[46:54].strip())
-                atoms.append((x, y, z))
-        # elif line.startswith("MODEL"):
-        #     current_model = int(line[10:14].strip())
-    return atoms
-
-
-def compute_contacts(atoms, threshold):
-    contacts = []
-    for i in range(len(atoms)-2):
-        for j in range(i+2, len(atoms)):
-            if dist(atoms[i], atoms[j]) < threshold:
-                contacts.append((i+1, j+1))
-    return contacts
-
-
-def write_output(contacts, file):
-    for c in contacts:
-        file.write("\t".join(map(str, c))+"\n")
-
-
-def pdb_to_cm(file, threshold, chain=".", model=1):
-    atoms = read_atoms(file, chain, model)
-    return compute_contacts(atoms, threshold)
-
-
-def download_pdb(pdb_name):
-    # First, try to download from PDB bank.
-    url = RCSB_URL.format(pdb_name)
-    get = requests.get(url)
-    if get.status_code == 200:
-        with open(f"{pdb_name}.pdb", "wb") as f:
-            f.write(get.content)
-        return
-    # Then, try to download from AlphaFold
-    url = ALPHAFOLD_URL.format(pdb_name)
-    get = requests.get(url)
-    if get.status_code == 200:
-        content = json.loads(get.content)
-        assert len(content) == 1
-
-        pdbUrl = content[0].get("pdbUrl")
-        if pdbUrl is None:
-            raise RuntimeError("No PDB url in AlphaFold for {}".format(pdb_name))
-        # Get the actual PDB.
-        content = requests.get(pdbUrl)
-        if content.status_code == 200:
-            with open(f"{pdb_name}.pdb", "wb") as f:
-                f.write(content.content)
-            return
-
-    raise RuntimeError("Cannot download {}".format(pdb_name))
-
-
-with open('ensp_uniprot.txt') as f:
-    e = f.read()
-    e_sp = e.split('ENSP')
-
-with open('protein.SHS27k.sequences.dictionary.pro3.tsv') as f:
+with open(args.protein_seq_file) as f:
     protein_sequence = f.readlines()
 
-list_all = []
 pdbs = []
 # Collect all pdb files to download.
 for liness1 in tqdm(protein_sequence):
     line1 = liness1.split('\t')
-    li = line1[0][10:]
-    for i in range(1690):
-        e_zj = e_sp[i]
-        res = li in e_zj
-        if res:
-            li2 = e_zj[13:-9]
-            pdb_file_name = li2 + '.pdb'
-            pdbs.append(li2)
-            break
+    li = line1[0][9:]
+    li2 = ENSP_2_UNIPROT.get(li)
+    if li2 is None:
+        raise ValueError(f"Unrecognized ENSP: {li}")
+    pdbs.append(li2)
 
 
 # Worker to parallelize.
@@ -132,10 +69,32 @@ with ThreadPool() as pool:
 
 # Read all the pdb files and extract interactions.
 print("  [DEBUG] Reading concat lists from PDB files")
+
+all_for_assign = np.loadtxt(args.all_for_assign)
+assert len(all_for_assign.shape) == 2
+
+adj_list     = []
+feature_list = []
 for pdb in tqdm(pdbs):
     pdb_file_name = pdb + ".pdb"
-    contacts = pdb_to_cm(open(pdb_file_name, "r"), args.distance)
-    list_all.append(contacts)
+    with open(pdb_file_name, "r") as f:
+        contacts = pdb_to_cm(f, args.distance)
+        f.seek(0)
+        xx = pdb_to_x(f, 7.5)  # @NOTE: why 7.5?
 
-list_all = np.array(list_all)
-np.save('edge_list_12.npy',list_all)
+    adj_list.append(contacts)
+
+    # Prepare the feature.
+    x_p = np.zeros((len(xx), all_for_assign.shape[1]))
+    for j in range(len(xx)):
+        idx = PROTEIN_2_IDX_TABLE.get(xx[j])
+        if idx is not None:
+            x_p[j] = all_for_assign[idx, :]
+
+    feature_list.append(x_p)
+
+
+# Save.
+adj_list = np.array(adj_list)
+np.save(args.out_adj, adj_list)
+torch.save(feature_list, args.out_feat)
