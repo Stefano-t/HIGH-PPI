@@ -1,8 +1,5 @@
-import os
-import time
 import math
 import json
-import random
 import numpy as np
 import argparse
 import torch
@@ -11,7 +8,9 @@ import torch.nn as nn
 from tqdm import tqdm
 from gnn_models_sag import ppi_model
 from gnn_data import GNN_DATA
-from utils import Metrictor_PPI, print_file
+from utils import Metrictor_PPI, multi2big_x, multi2big_batch, multi2big_edge
+
+
 parser = argparse.ArgumentParser(description='HIGH-PPI_model_training')
 
 parser.add_argument('--ppi_path', default=None, type=str,
@@ -28,57 +27,6 @@ parser.add_argument('--index_path', default=None, type=str,
                     help='training and test PPI index')
 parser.add_argument('--model_path', default=None, type=str,
                     help="path for trained model")
-
-def multi2big_x(x_ori):
-    x_cat = torch.zeros(1, 7)
-    x_num_index = torch.zeros(1553)
-    for i in range(1553):
-        x_now = torch.tensor(x_ori[i])
-        x_num_index[i] = torch.tensor(x_now.size(0))
-        x_cat = torch.cat((x_cat, x_now), 0)
-    return x_cat[1:, :], x_num_index
-
-def multi2big_batch(x_num_index):
-    num_sum = x_num_index.sum()
-    num_sum = num_sum.int()
-    batch = torch.zeros(num_sum)
-    count = 1
-    for i in range(1,1553):
-        zj1 = x_num_index[:i]
-        zj11 = zj1.sum()
-        zj11 = zj11.int()
-        zj22 = zj11 + x_num_index[i]
-        zj22 = zj22.int()
-        size1 = x_num_index[i]
-        size1 = size1.int()
-        tc = count * torch.ones(size1)
-        batch[zj11:zj22] = tc
-        test = batch[zj11:zj22]
-        count = count + 1
-    batch = batch.int()
-    return batch
-
-def multi2big_edge(edge_ori, num_index):
-    edge_cat = torch.zeros(2, 1)
-    edge_num_index = torch.zeros(1553)
-    for i in range(1553):
-        edge_index_p = edge_ori[i]
-        edge_index_p = np.asarray(edge_index_p)
-        edge_index_p = torch.tensor(edge_index_p.T)
-        edge_num_index[i] = torch.tensor(edge_index_p.size(1))
-        if i == 0:
-            offset = 0
-        else:
-            zj = torch.tensor(num_index[:i])
-            offset = zj.sum()
-        edge_cat = torch.cat((edge_cat, edge_index_p + offset), 1)
-    return edge_cat[:, 1:], edge_num_index
-
-
-def boolean_string(s):
-    if s not in {'False', 'True'}:
-        raise ValueError('Not a valid boolean string')
-    return s == 'True'
 
 
 def test(model, graph, test_mask, device,batch, p_x_all, p_edge_all):
@@ -142,9 +90,9 @@ def main():
     for edge in temp:
         ppi_list.append(list(edge))
 
-    truth_edge_num = len(ppi_list) // 2
+    # truth_edge_num = len(ppi_list) // 2
     # fake_edge_num = len(ppi_data.fake_edge) // 2
-    fake_edge_num = 0
+    # fake_edge_num = 0
     index_path = args.index_path
     with open(index_path, 'r') as f:
         index_dict = json.load(f)
@@ -207,11 +155,10 @@ def main():
 
     graph.to(device)
 
-    p_x_all = torch.load(args.p_feat_matrix)
-    # p_edge_all = np.load('/apdcephfs/share_1364275/kaithgao/edge_list_12.npy', allow_pickle=True)
+    p_x_all    = torch.load(args.p_feat_matrix)
     p_edge_all = np.load(args.p_adj_matrix, allow_pickle=True)
+
     p_x_all, x_num_index = multi2big_x(p_x_all)
-    # p_x_all = p_x_all[:,torch.arange(p_x_all.size(1))!=6]
     p_edge_all, _ = multi2big_edge(p_edge_all, x_num_index)
     p_edge_all = p_edge_all - 1  # @NOTE: remove off-by-one error.
 

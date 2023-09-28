@@ -69,7 +69,7 @@ class GNN_DATA:
 
             if temp_data not in self.ppi_dict.keys():
                 self.ppi_dict[temp_data] = ppi_name
-                temp_label = [0, 0, 0, 0, 0, 0, 0]
+                temp_label = [0, 0, 0, 0, 0, 0, 0]  # @NOTE: same length as `class_map`...
                 temp_label[class_map[line[label_index]]] = 1
                 self.ppi_label_list.append(temp_label)
                 ppi_name += 1
@@ -292,31 +292,3 @@ class GNN_DATA:
                 str = f.read()
                 self.ppi_split_dict = json.loads(str, strict=False)
                 f.close()
-# ppi_data = GNN_DATA(ppi_path = './data/protein.actions.SHS27k.STRING.txt')
-# ppi_data.get_feature_origin(pseq_path = './data/protein.SHS27k.sequences.dictionary.tsv', vec_path = './data/vec5_CTC.txt')
-
-# ppi_data = GNN_DATA(ppi_path = './data/protein.actions.SHS27k.STRING.pro2.txt')
-# ppi_data.get_feature_origin(pseq_path = './data/protein.SHS27k.sequences.dictionary.pro3.tsv', vec_path = './data/vec5_CTC.txt')
-#
-# ppi_data.generate_data()
-# ppi_data.split_dataset(train_valid_index_path='./train_val_split_data/train_val_split.json', random_new=True, mode='random')
-# graph = ppi_data.data
-
-
-# for liness in tqdm(open('./data/protein.SHS27k.sequences.dictionary.pro2.tsv')):
-#     aa = ppi_data.protein_name
-#     id1 = liness[:20]
-#     resu = id1 in aa.keys()
-#     if resu == False:
-#         print(id1)
-# qs = aa.keys()
-# count_k = 0
-# aad = 1
-# ff = open('./data/protein.SHS27k.sequences.dictionary.pro3.tsv', 'w', encoding = "utf-8")
-# for liness in tqdm(open('./data/protein.SHS27k.sequences.dictionary.pro2.tsv')):
-#     liness_id = liness.split("\t")
-#     liness_id1 = liness_id[0]
-#     count_k = count_k + 1
-#     qs1 = liness_id1 in qs
-#     if qs1 == True:
-#         ff.writelines(liness)

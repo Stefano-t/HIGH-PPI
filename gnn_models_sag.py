@@ -13,12 +13,18 @@ from torch_geometric.nn import global_mean_pool
 
 
 class GIN(torch.nn.Module):
-    def __init__(self,  hidden=512, train_eps=True, class_num=7):
+    def __init__(
+        self,
+        input_size: int,
+        hidden: int = 512,
+        train_eps: bool = True,
+        class_num: int = 7,
+    ):
         super(GIN, self).__init__()
         self.train_eps = train_eps
         self.gin_conv1 = GINConv(
             nn.Sequential(
-                nn.Linear(128, hidden),  # @NOTE: 128 is the output dim of BGNN (or GCN)
+                nn.Linear(iinput_size, hidden),
                 nn.ReLU(),
                 nn.Linear(hidden, hidden),
                 nn.ReLU(),
@@ -156,10 +162,12 @@ class GCN(nn.Module):
 
 device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 class ppi_model(nn.Module):
-    def __init__(self):
+    def __init__(
+            self, class_num: int, bgnn_hidden_size: int, tgnn_hidden_size: int
+    ):
         super(ppi_model,self).__init__()
-        self.BGNN = GCN()
-        self.TGNN = GIN()
+        self.BGNN = GCN(class_num=class_num, hidden_size=bgnn_hidden_size)
+        self.TGNN = GIN(bgnn_hidden_size, hidden=tgnn_hidden_size, class_num=class_num)
 
     def forward(self, batch, p_x_all, p_edge_all, edge_index, train_edge_id, p=0.5):
         edge_index = edge_index.to(device)
