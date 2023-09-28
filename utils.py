@@ -24,6 +24,7 @@ def multi2big_x(x_ori):
         x_cat = torch.cat((x_cat, x_now), 0)
     return x_cat[1:, :], x_num_index
 
+
 def multi2big_batch(x_num_index):
     """Assigns an index to each consecutive index.
 
@@ -46,6 +47,7 @@ def multi2big_batch(x_num_index):
         count = count + 1
     batch = batch.int()
     return batch
+
 
 def multi2big_edge(edge_ori, num_index):
     """Transfroms the input list of edges into a single edge array.

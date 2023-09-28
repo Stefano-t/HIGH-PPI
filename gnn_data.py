@@ -62,7 +62,7 @@ class GNN_DATA:
             temp_data = ""
             zj1 = line[p1_index]
             zj2 = line[p2_index]
-            if line[p1_index] < line[p2_index]:
+            if line[p1_index] < line[p2_index]:  # @NOTE: this's just a sting comp.
                 temp_data = line[p1_index] + "__" + line[p2_index]
             else:
                 temp_data = line[p2_index] + "__" + line[p1_index]

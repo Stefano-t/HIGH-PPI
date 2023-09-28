@@ -29,26 +29,22 @@ parser.add_argument('--model_path', default=None, type=str,
                     help="path for trained model")
 
 
-def test(model, graph, test_mask, device,batch, p_x_all, p_edge_all):
-    valid_pre_result_list = []
-    valid_label_list = []
-
+def test(model, graph, test_mask, device, batch, p_x_all, p_edge_all):
     model.eval()
 
-    batch_size = 64
+    batch_size = 64   # @NOTE: same from paper!!!
 
     valid_steps = math.ceil(len(test_mask) / batch_size)
 
     valid_pre_result_list = []
-    valid_label_list = []
-    true_prob_list = []
+    valid_label_list      = []
+    true_prob_list        = []
     for step in tqdm(range(valid_steps)):
         if step == valid_steps-1:
             valid_edge_id = test_mask[step*batch_size:]
         else:
             valid_edge_id = test_mask[step*batch_size : step*batch_size + batch_size]
 
-        # output = model(graph.x, graph.edge_index, valid_edge_id)
         output = model(batch, p_x_all, p_edge_all, graph.edge_index, valid_edge_id)
         label = graph.edge_attr_1[valid_edge_id]
         label = label.type(torch.FloatTensor).to(device)
@@ -96,50 +92,44 @@ def main():
     index_path = args.index_path
     with open(index_path, 'r') as f:
         index_dict = json.load(f)
-        f.close()
-    graph.train_mask = index_dict['train_index']
 
-    graph.val_mask = index_dict['valid_index']
+    graph.train_mask = index_dict['train_index']
+    graph.val_mask   = index_dict['valid_index']
 
     print("train gnn, train_num: {}, valid_num: {}".format(len(graph.train_mask), len(graph.val_mask)))
 
     node_vision_dict = {}
     for index in graph.train_mask:
-        ppi = ppi_list[index]
-        if ppi[0] not in node_vision_dict.keys():
-            node_vision_dict[ppi[0]] = 1
-        if ppi[1] not in node_vision_dict.keys():
-            node_vision_dict[ppi[1]] = 1
+        ppi_0, ppi_1 = ppi_list[index]
+        if ppi_0 not in node_vision_dict:
+            node_vision_dict[ppi_0] = 1
+        if ppi_1 not in node_vision_dict:
+            node_vision_dict[ppi_1] = 1
 
     for index in graph.val_mask:
-        ppi = ppi_list[index]
-        if ppi[0] not in node_vision_dict.keys():
-            node_vision_dict[ppi[0]] = 0
-        if ppi[1] not in node_vision_dict.keys():
-            node_vision_dict[ppi[1]] = 0
+        ppi_0, ppi_1 = ppi_list[index]
+        if ppi_0 not in node_vision_dict:
+            node_vision_dict[ppi_0] = 0
+        if ppi_1 not in node_vision_dict:
+            node_vision_dict[ppi_1] = 0
 
-    vision_num = 0
-    unvision_num = 0
-    for node in node_vision_dict:
-        if node_vision_dict[node] == 1:
-            vision_num += 1
-        elif node_vision_dict[node] == 0:
-            unvision_num += 1
+    counts = [0, 0]
+    for v in node_vision_dict.values():
+        counts[v] += 1
+
+    vision_num   = counts[1]
+    unvision_num = counts[0]
+
     print("vision node num: {}, unvision node num: {}".format(vision_num, unvision_num))
 
-    test1_mask = []
-    test2_mask = []
-    test3_mask = []
-
+    masks = ([], [], [])
     for index in graph.val_mask:
         ppi = ppi_list[index]
         temp = node_vision_dict[ppi[0]] + node_vision_dict[ppi[1]]
-        if temp == 2:
-            test1_mask.append(index)
-        elif temp == 1:
-            test2_mask.append(index)
-        elif temp == 0:
-            test3_mask.append(index)
+        masks[temp].append(index)
+
+    test3_mask, test2_mask, test1_mask = masks
+
     print("test1 edge num: {}, test2 edge num: {}, test3 edge num: {}".format(len(test1_mask), len(test2_mask), len(test3_mask)))
 
     graph.test1_mask = test1_mask
@@ -147,11 +137,6 @@ def main():
     graph.test3_mask = test3_mask
 
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
-
-    model = ppi_model()
-    model.to(device)
-    model_path = args.model_path
-    model.load_state_dict(torch.load(model_path)['state_dict'])
 
     graph.to(device)
 
@@ -164,7 +149,16 @@ def main():
 
     batch = multi2big_batch(x_num_index)+1
 
-    test(model, graph, graph.val_mask, device,batch, p_x_all, p_edge_all)
+    model = ppi_model(
+        class_num=p_x_all.shape[1],
+        bgnn_hidden_size=128,
+        tgnn_hidden_size=512,
+    )
+    model.to(device)
+    model_path = args.model_path
+    model.load_state_dict(torch.load(model_path)['state_dict'])
+
+    test(model, graph, graph.val_mask, device, batch, p_x_all, p_edge_all)
 
 if __name__ == "__main__":
     main()
