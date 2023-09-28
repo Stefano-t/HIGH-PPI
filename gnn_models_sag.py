@@ -24,7 +24,7 @@ class GIN(torch.nn.Module):
         self.train_eps = train_eps
         self.gin_conv1 = GINConv(
             nn.Sequential(
-                nn.Linear(iinput_size, hidden),
+                nn.Linear(input_size, hidden),
                 nn.ReLU(),
                 nn.Linear(hidden, hidden),
                 nn.ReLU(),
