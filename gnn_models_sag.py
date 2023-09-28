@@ -1,17 +1,13 @@
 import torch
-import math
-import numpy as np
 import torch.nn as nn
 import torch.nn.functional as F
-import random
-# from pygcn.layers import GraphConvolution
-# from dgl.nn import GraphConv, EdgeWeightNorm
-from torch_geometric.nn import GINConv, JumpingKnowledge, global_mean_pool, SAGEConv, GCNConv
+from torch_geometric.nn import GINConv, global_mean_pool, GCNConv
 from torch_geometric.nn.pool import SAGPooling
-from torch_geometric.nn import global_mean_pool
 
 
-
+# @NOTE: paper states that GIN blocks are 3, but only 2 are actually used during
+# the `forward` phase. Furthemore, the GIN block itself contains 2 Linear and 2
+# RELU, while the paper states only 1 of each layer is used...
 class GIN(torch.nn.Module):
     def __init__(
         self,
@@ -89,7 +85,7 @@ class GIN(torch.nn.Module):
         return x
 
 
-
+# @NOTE: the paper states just 2 GCN layers... here we have 4!!!
 class GCN(nn.Module):
     def __init__(self, class_num: int = 7, hidden_size: int = 128):
         super(GCN, self).__init__()
