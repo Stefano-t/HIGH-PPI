@@ -37,16 +37,14 @@ Example: predicting unknown PPIs in SHS27k datasets with native structures:
 Download  `protein.actions.SHS27k.STRING.pro2.txt`, `protein.SHS27k.sequences.dictionary.pro3.tsv`, `edge_list_12`, `x_list` and `vec5_CTC.txt` to `./HIGH-PPI-main/protein_info/`.
 
 ## Data Processing for New Datasets (if applicable)
-Prepare all related PDB files. Native protein structures can be downloaded in batches from the [RCSB PDB](https://www.rcsb.org/downloads), and predicted protein structures with errors can be downloaded from the [AlphaFold database](https://alphafold.ebi.ac.uk/). Put all of the PDB files in `./protein_info/`.
+Prepare all related PDB files. Native protein structures can be downloaded in batches from the [RCSB PDB](https://www.rcsb.org/downloads), and predicted protein structures with errors can be downloaded from the [AlphaFold database](https://alphafold.ebi.ac.uk/). Put all of the PDB files in `./protein_info/pbds`. You can customize the destination folder supplying `--pdb_dest` in the script below.
 
-Generate adjacency matrix with native PDB files:
-```
+Generate adjacency and feature matrices with native PDB files:
+```bash
 python ./protein_info/generate_adj.py --distance 12
 ```
-Generate feature matrix:
-```
-python ./protein_info/generate_feat.py
-```
+
+For a complete list of supported input parameters, run `python ./protein_info/generate_adj.py --help`.
 
 ## Training
 To predict PPIs, use 'model_train.py' script to train HIGH-PPI with the following options:

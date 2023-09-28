@@ -2,6 +2,7 @@ import math
 import re
 import requests
 import json
+import os
 
 # Download URLs
 RCSB_URL = "https://files.rcsb.org/download/{}"
@@ -66,22 +67,22 @@ def write_output(contacts, file):
         file.write("\t".join(map(str, c))+"\n")
 
 
-def pdb_to_cm(file, threshold, chain=".", model=1):
-    atoms, _ = read_atoms(file, chain, model)
-    return compute_contacts(atoms, threshold)
+def pdb_to_cm_and_ajs(file, threshold, chain=".", model=1):
+    atoms, ajs = read_atoms(file, chain, model)
+    contacts = compute_contacts(atoms, threshold)
+    return atoms, ajs
 
 
-def pdb_to_x(file, threshold, chain=".", model=1):
-    _, ajs = read_atoms(file, chain, model)
-    return ajs
+def download_pdb(pdb_name: str, dest_folder: str):
+    if not os.path.isdir(dest_folder):
+        os.makedirs(dest_folder, exist_ok=True)
+    destination = os.path.join(dest_folder, f"{pdb_name}.pdb")
 
-
-def download_pdb(pdb_name):
     # First, try to download from PDB bank.
     url = RCSB_URL.format(pdb_name)
     get = requests.get(url)
     if get.status_code == 200:
-        with open(f"{pdb_name}.pdb", "wb") as f:
+        with open(destination, "wb") as f:
             f.write(get.content)
         return
     # Then, try to download from AlphaFold
@@ -97,7 +98,7 @@ def download_pdb(pdb_name):
         # Get the actual PDB.
         content = requests.get(pdbUrl)
         if content.status_code == 200:
-            with open(f"{pdb_name}.pdb", "wb") as f:
+            with open(destination, "wb") as f:
                 f.write(content.content)
             return
 
