@@ -40,16 +40,17 @@ def train(batch, p_x_all, p_edge_all, model, graph, ppi_list, loss_fn, optimizer
           result_file_path, summary_writer, save_path,
           batch_size=512, epochs=1000, scheduler=None,
           got=False):
-    global_step = 0
-    global_best_valid_f1 = 0.0
+
+    global_step                = 0
+    global_best_valid_f1       = 0.0
     global_best_valid_f1_epoch = 0
 
     for epoch in range(epochs):
 
-        recall_sum = 0.0
+        recall_sum    = 0.0
         precision_sum = 0.0
-        f1_sum = 0.0
-        loss_sum = 0.0
+        f1_sum        = 0.0
+        loss_sum      = 0.0
 
         steps = math.ceil(len(graph.train_mask) / batch_size)
 
@@ -88,10 +89,10 @@ def train(batch, p_x_all, p_edge_all, model, graph, ppi_list, loss_fn, optimizer
 
             metrics.show_result()
 
-            recall_sum += metrics.Recall
+            recall_sum    += metrics.Recall
             precision_sum += metrics.Precision
-            f1_sum += metrics.F1
-            loss_sum += loss.item()
+            f1_sum        += metrics.F1
+            loss_sum      += loss.item()
 
             summary_writer.add_scalar('train/loss', loss.item(), global_step)
             summary_writer.add_scalar('train/precision', metrics.Precision, global_step)
@@ -107,8 +108,9 @@ def train(batch, p_x_all, p_edge_all, model, graph, ppi_list, loss_fn, optimizer
                    os.path.join(save_path, 'gnn_model_train.ckpt'))
 
         valid_pre_result_list = []
-        valid_label_list = []
-        true_prob_list = []
+        valid_label_list      = []
+        true_prob_list        = []
+
         valid_loss_sum = 0.0
 
         model.eval()
@@ -144,10 +146,10 @@ def train(batch, p_x_all, p_edge_all, model, graph, ppi_list, loss_fn, optimizer
 
         metrics.show_result()
 
-        recall = recall_sum / steps
+        recall    = recall_sum / steps
         precision = precision_sum / steps
-        f1 = f1_sum / steps
-        loss = loss_sum / steps
+        f1        = f1_sum / steps
+        loss      = loss_sum / steps
 
         valid_loss = valid_loss_sum / valid_steps
 
@@ -225,9 +227,9 @@ def main():
 
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=10,
                                                            verbose=True)
-    save_path = args.save_path
     loss_fn = nn.BCEWithLogitsLoss().to(device)
 
+    save_path = args.save_path
     if not os.path.exists(save_path):
         os.mkdir(save_path)
 

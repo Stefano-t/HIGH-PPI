@@ -1,4 +1,3 @@
-import os
 import json
 import numpy as np
 import copy
@@ -8,7 +7,7 @@ import random
 from tqdm import tqdm
 
 from utils import UnionFindSet, get_bfs_sub_graph, get_dfs_sub_graph
-from torch_geometric.data import Data, Dataset, InMemoryDataset, DataLoader
+from torch_geometric.data import Data
 
 
 class GNN_DATA:
@@ -28,7 +27,7 @@ class GNN_DATA:
         # maxlen = 0
         self.node_num = 0
         self.edge_num = 0
-        if exclude_protein_path != None:
+        if exclude_protein_path is not None:
             with open(exclude_protein_path, 'r') as f:
                 ex_protein = json.load(f)
                 f.close()
@@ -56,12 +55,8 @@ class GNN_DATA:
             if line[p2_index] not in self.protein_name.keys():
                 self.protein_name[line[p2_index]] = name
                 name += 1
-            if p1_index == 11:
-                aaaaaa = 1
             # get edge and its label
             temp_data = ""
-            zj1 = line[p1_index]
-            zj2 = line[p2_index]
             if line[p1_index] < line[p2_index]:  # @NOTE: this's just a sting comp.
                 temp_data = line[p1_index] + "__" + line[p2_index]
             else:
@@ -79,7 +74,7 @@ class GNN_DATA:
                 temp_label[class_map[line[label_index]]] = 1
                 self.ppi_label_list[index] = temp_label
 
-        if bigger_ppi_path != None:
+        if bigger_ppi_path is not None:
             skip_head = True
             for line in tqdm(open(bigger_ppi_path)):
                 if skip_head:
@@ -151,8 +146,6 @@ class GNN_DATA:
 
         for line in tqdm(open(self.pseq_path)):
             line = line.strip().split('\t')
-            ls1 = line[0]
-            ls2 = line[1]
             if line[0] not in self.pseq_dict.keys():
                 self.pseq_dict[line[0]] = line[1]
                 self.protein_len.append(len(line[1]))
@@ -245,7 +238,6 @@ class GNN_DATA:
                 jsobj = json.dumps(self.ppi_split_dict)
                 with open(train_valid_index_path, 'w') as f:
                     f.write(jsobj)
-                    f.close()
 
             elif mode == 'bfs' or mode == 'dfs':
                 print("use {} methed split train and valid dataset".format(mode))
@@ -282,7 +274,6 @@ class GNN_DATA:
                 jsobj = json.dumps(self.ppi_split_dict)
                 with open(train_valid_index_path, 'w') as f:
                     f.write(jsobj)
-                    f.close()
 
             else:
                 print("your mode is {}, you should use bfs, dfs or random".format(mode))
@@ -291,4 +282,3 @@ class GNN_DATA:
             with open(train_valid_index_path, encoding='utf-8-sig',errors='ignore') as f:
                 str = f.read()
                 self.ppi_split_dict = json.loads(str, strict=False)
-                f.close()

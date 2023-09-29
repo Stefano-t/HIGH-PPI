@@ -35,12 +35,13 @@ def read_atoms(file, chain=".", model=1):
     pattern = re.compile(chain)  # @NOTE: 'chain' is never set.
 
     atoms = []
-    ajs = []
+    ajs   = []
     for line in file:
         line = line.strip()
         if line.startswith("ATOM"):
             type = line[12:16].strip()
             chain = line[21:22]
+            # @NOTE: why are we forcing the type to be "CA" ???
             if type == "CA" and re.match(pattern, chain):
                 x = float(line[30:38].strip())
                 y = float(line[38:46].strip())
@@ -62,15 +63,10 @@ def compute_contacts(atoms, threshold):
     return contacts
 
 
-def write_output(contacts, file):
-    for c in contacts:
-        file.write("\t".join(map(str, c))+"\n")
-
-
 def pdb_to_cm_and_ajs(file, threshold, chain=".", model=1):
     atoms, ajs = read_atoms(file, chain, model)
     contacts = compute_contacts(atoms, threshold)
-    return atoms, ajs
+    return contacts, ajs
 
 
 def download_pdb(pdb_name: str, dest_folder: str):
