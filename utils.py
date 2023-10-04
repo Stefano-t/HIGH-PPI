@@ -43,7 +43,6 @@ def multi2big_batch(x_num_index):
         size1 = size1.int()
         tc = count * torch.ones(size1)
         batch[zj11:zj22] = tc
-        # test = batch[zj11:zj22]
         count = count + 1
     batch = batch.int()
     return batch
@@ -133,8 +132,6 @@ class Metrictor_PPI:
         self.Precision = self.TP / (self.TP + self.FP + 1e-10)
         self.Recall = self.TP / (self.TP + self.FN + 1e-10)
         self.F1 = 2 * self.Precision * self.Recall / (self.Precision + self.Recall + 1e-10)
-        # fpr, tpr, thresholds = metrics.roc_curve(self.tru, self.pre, pos_label=1)
-        # self.Auc = metrics.auc(fpr, tpr)
         aupr_entry_1 = self.tru
         aupr_entry_2 = self.true_prob
         aupr = np.zeros(7)
@@ -148,13 +145,10 @@ class Metrictor_PPI:
             print_file("Precision: {}".format(self.Precision), file)
             print_file("Recall: {}".format(self.Recall), file)
             print_file("F1-Score: {}".format(self.F1), file)
-            # print_file("AUC: {}".format(self.Auc), file)
-#             print_file("Aupr: {}".format(self.Aupr), file)
 
 
 class UnionFindSet(object):
     def __init__(self, m):
-        # m, n = len(grid), len(grid[0])
         self.roots = [i for i in range(m)]
         self.rank = [0 for i in range(m)]
         self.count = m
@@ -228,7 +222,6 @@ def get_dfs_sub_graph(ppi_list, node_num, node_to_edge_index, sub_graph_size):
     stack.append(random_node)
 
     while len(selected_edge_index) < sub_graph_size:
-        # print(len(selected_edge_index), len(stack), len(selected_node))
         cur_node = stack[-1]
         if cur_node in selected_node:
             flag = True

@@ -86,9 +86,6 @@ def main():
     for edge in temp:
         ppi_list.append(list(edge))
 
-    # truth_edge_num = len(ppi_list) // 2
-    # fake_edge_num = len(ppi_data.fake_edge) // 2
-    # fake_edge_num = 0
     index_path = args.index_path
     with open(index_path, 'r') as f:
         index_dict = json.load(f)
@@ -121,20 +118,6 @@ def main():
     unvision_num = counts[0]
 
     print("vision node num: {}, unvision node num: {}".format(vision_num, unvision_num))
-
-    masks = ([], [], [])
-    for index in graph.val_mask:
-        ppi = ppi_list[index]
-        temp = node_vision_dict[ppi[0]] + node_vision_dict[ppi[1]]
-        masks[temp].append(index)
-
-    test3_mask, test2_mask, test1_mask = masks
-
-    print("test1 edge num: {}, test2 edge num: {}, test3 edge num: {}".format(len(test1_mask), len(test2_mask), len(test3_mask)))
-
-    graph.test1_mask = test1_mask
-    graph.test2_mask = test2_mask
-    graph.test3_mask = test3_mask
 
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 

@@ -41,7 +41,6 @@ def read_atoms(file, chain=".", model=1):
         if line.startswith("ATOM"):
             type = line[12:16].strip()
             chain = line[21:22]
-            # @NOTE: why are we forcing the type to be "CA" ???
             if type == "CA" and re.match(pattern, chain):
                 x = float(line[30:38].strip())
                 y = float(line[38:46].strip())

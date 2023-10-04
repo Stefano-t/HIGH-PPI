@@ -24,8 +24,6 @@ class GIN(torch.nn.Module):
                 nn.ReLU(),
                 nn.Linear(hidden, hidden),
                 nn.ReLU(),
-                # nn.Linear(hidden, hidden),
-                # nn.ReLU(),
                 nn.BatchNorm1d(hidden),
             ), train_eps=self.train_eps
         )
@@ -33,8 +31,6 @@ class GIN(torch.nn.Module):
             nn.Sequential(
                 nn.Linear(hidden, hidden),
                 nn.ReLU(),
-                # nn.Linear(hidden, hidden),
-                # nn.ReLU(),
                 nn.BatchNorm1d(hidden),
             ), train_eps=self.train_eps
         )
@@ -60,24 +56,20 @@ class GIN(torch.nn.Module):
 
         self.gin_conv1.reset_parameters()
         self.gin_conv2.reset_parameters()
-        # self.gin_conv3.reset_parameters()
         self.lin1.reset_parameters()
         self.fc1.reset_parameters()
         self.fc2.reset_parameters()
 
 
-    def forward(self, x, edge_index, train_edge_id, p=0.5):
+    def forward(self, x, edge_index, train_edge_id):
 
         x = self.gin_conv1(x, edge_index)
         x = self.gin_conv2(x, edge_index)
-        # x = self.gin_conv3(x, edge_index)
         x = F.relu(self.lin1(x))
         x = F.dropout(x, p=0.5, training=self.training)
         node_id = edge_index[:, train_edge_id]
         x1 = x[node_id[0]]
         x2 = x[node_id[1]]
-        # x = torch.cat([x1, x2], dim=1)
-        # x = self.fc1(x)
         x = torch.mul(x1, x2)
         x = self.fc2(x)
 
@@ -151,10 +143,7 @@ class GCN(nn.Module):
         batch = y[3]
         edge_index = y[1]
 
-        # y = self.sag4(x, edge_index, batch = batch)
-
         return global_mean_pool(y[0], y[3])
-        # return y[0]
 
 device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 class ppi_model(nn.Module):
@@ -165,7 +154,7 @@ class ppi_model(nn.Module):
         self.BGNN = GCN(class_num=class_num, hidden_size=bgnn_hidden_size)
         self.TGNN = GIN(bgnn_hidden_size, hidden=tgnn_hidden_size, class_num=class_num)
 
-    def forward(self, batch, p_x_all, p_edge_all, edge_index, train_edge_id, p=0.5):
+    def forward(self, batch, p_x_all, p_edge_all, edge_index, train_edge_id):
         edge_index = edge_index.to(device)
         batch = batch.to(torch.int64).to(device)
         x = p_x_all.to(torch.float32).to(device)

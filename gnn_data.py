@@ -24,7 +24,6 @@ class GNN_DATA:
 
         name = 0
         ppi_name = 0
-        # maxlen = 0
         self.node_num = 0
         self.edge_num = 0
         if exclude_protein_path is not None:
@@ -122,7 +121,6 @@ class GNN_DATA:
         for i in tqdm(range(ppi_num)):
             seq1_name = self.ppi_list[i][0]
             seq2_name = self.ppi_list[i][1]
-            # print(len(self.protein_name))
             self.ppi_list[i][0] = self.protein_name[seq1_name]
             self.ppi_list[i][1] = self.protein_name[seq2_name]
 
@@ -130,7 +128,6 @@ class GNN_DATA:
             for i in tqdm(range(ppi_num)):
                 temp_ppi = self.ppi_list[i][::-1]
                 temp_ppi_label = self.ppi_label_list[i]
-                # if temp_ppi not in self.ppi_list:
                 self.ppi_list.append(temp_ppi)
                 self.ppi_label_list.append(temp_ppi_label)
 
