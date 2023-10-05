@@ -272,6 +272,14 @@ class GNN_DATA:
                 with open(train_valid_index_path, 'w') as f:
                     f.write(jsobj)
 
+            elif mode == "test":
+                ppi_num = int(self.edge_num // 2)
+                random_list = [i for i in range(ppi_num)]
+                random.shuffle(random_list)
+
+                self.ppi_split_dict = {}
+                self.ppi_split_dict['test_index'] = random_list
+
             else:
                 print("your mode is {}, you should use bfs, dfs or random".format(mode))
                 return

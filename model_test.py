@@ -1,9 +1,10 @@
 import math
-import json
 import numpy as np
 import argparse
 import torch
 import torch.nn as nn
+from pathlib import Path
+from datetime import datetime
 
 from tqdm import tqdm
 from gnn_models_sag import ppi_model
@@ -27,9 +28,10 @@ parser.add_argument('--index_path', default=None, type=str,
                     help='training and test PPI index')
 parser.add_argument('--model_path', default=None, type=str,
                     help="path for trained model")
+parser.add_argument("--result_folder", default="results", type=str, help="Folder where to store results")
 
 
-def test(model, graph, test_mask, device, batch, p_x_all, p_edge_all):
+def test(model, graph, test_mask, device, batch, p_x_all, p_edge_all, result_file):
     model.eval()
 
     batch_size = 64   # @NOTE: same from paper!!!
@@ -57,8 +59,9 @@ def test(model, graph, test_mask, device, batch, p_x_all, p_edge_all):
         true_prob_list.append(m(output).cpu().data)
 
     valid_pre_result_list = torch.cat(valid_pre_result_list, dim=0)
-    valid_label_list = torch.cat(valid_label_list, dim=0)
-    true_prob_list = torch.cat(true_prob_list, dim = 0)
+    valid_label_list      = torch.cat(valid_label_list, dim=0)
+    true_prob_list        = torch.cat(true_prob_list, dim = 0)
+
     metrics = Metrictor_PPI(valid_pre_result_list, valid_label_list, true_prob_list)
 
     metrics.show_result()
@@ -68,8 +71,15 @@ def test(model, graph, test_mask, device, batch, p_x_all, p_edge_all):
     print(valid_pre_result_list)
     print(valid_label_list)
 
-def main():
+    # Dump to file
+    with open(result_file, "w") as out:
+        out.write("recall,precision,f1,auprc\n")
+        for metric in [metrics.Recall, metrics.Precision, metrics.F1]:
+            out.write(f"{metric},")
+        out.write(f"{metrics.Aupr}\n")
 
+
+def main():
     args = parser.parse_args()
 
     ppi_data = GNN_DATA(ppi_path=args.ppi_path)
@@ -78,6 +88,11 @@ def main():
 
 
     ppi_data.generate_data()
+    ppi_data.split_dataset(
+        train_valid_index_path="./train_val_split_data/test.json",
+        random_new=True,
+        mode="test",
+    )
 
     graph = ppi_data.data
     temp = graph.edge_index.transpose(0, 1).numpy()
@@ -86,38 +101,7 @@ def main():
     for edge in temp:
         ppi_list.append(list(edge))
 
-    index_path = args.index_path
-    with open(index_path, 'r') as f:
-        index_dict = json.load(f)
-
-    graph.train_mask = index_dict['train_index']
-    graph.val_mask   = index_dict['valid_index']
-
-    print("train gnn, train_num: {}, valid_num: {}".format(len(graph.train_mask), len(graph.val_mask)))
-
-    node_vision_dict = {}
-    for index in graph.train_mask:
-        ppi_0, ppi_1 = ppi_list[index]
-        if ppi_0 not in node_vision_dict:
-            node_vision_dict[ppi_0] = 1
-        if ppi_1 not in node_vision_dict:
-            node_vision_dict[ppi_1] = 1
-
-    for index in graph.val_mask:
-        ppi_0, ppi_1 = ppi_list[index]
-        if ppi_0 not in node_vision_dict:
-            node_vision_dict[ppi_0] = 0
-        if ppi_1 not in node_vision_dict:
-            node_vision_dict[ppi_1] = 0
-
-    counts = [0, 0]
-    for v in node_vision_dict.values():
-        counts[v] += 1
-
-    vision_num   = counts[1]
-    unvision_num = counts[0]
-
-    print("vision node num: {}, unvision node num: {}".format(vision_num, unvision_num))
+    graph.test_mask = ppi_data.ppi_split_dict["test_index"]
 
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 
@@ -130,7 +114,7 @@ def main():
     p_edge_all, _ = multi2big_edge(p_edge_all, x_num_index)
     p_edge_all = p_edge_all - 1  # @NOTE: remove off-by-one error.
 
-    batch = multi2big_batch(x_num_index)+1
+    batch = multi2big_batch(x_num_index) + 1
 
     model = ppi_model(
         class_num=p_x_all.shape[1],
@@ -141,7 +125,12 @@ def main():
     model_path = args.model_path
     model.load_state_dict(torch.load(model_path)['state_dict'])
 
-    test(model, graph, graph.val_mask, device, batch, p_x_all, p_edge_all)
+    result_folder = Path(args.result_folder)
+    if not result_folder.is_dir():
+        result_folder.mkdir()
+    result_file = result_folder / datetime.now().isoformat()
+
+    test(model, graph, graph.test_mask, device, batch, p_x_all, p_edge_all, result_file)
 
 if __name__ == "__main__":
     main()

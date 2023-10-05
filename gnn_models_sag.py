@@ -160,5 +160,5 @@ class ppi_model(nn.Module):
         x = p_x_all.to(torch.float32).to(device)
         edge = torch.LongTensor(p_edge_all.to(torch.int64)).to(device)
         embs = self.BGNN(x, edge, batch-1)
-        final = self.TGNN(embs, edge_index, train_edge_id, p=0.5)
+        final = self.TGNN(embs, edge_index, train_edge_id)
         return final
