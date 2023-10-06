@@ -2,8 +2,9 @@ import numpy as np
 import os
 from itertools import cycle
 from tqdm import tqdm
+from functools import partial
 import argparse
-from multiprocessing.pool import ThreadPool
+from multiprocessing.pool import ThreadPool, Pool
 import torch
 from generate_utils import download_pdb, pdb_to_cm_and_ajs, PROTEIN_2_IDX_TABLE
 
@@ -71,7 +72,24 @@ def collect_pdbs(pdbs, dest_folder):
     return errors
 
 
+def _compute_worker(all_for_assign, pdb_dir, distance, pdb_name):
+    """Helper function to compute adjancey matrix and feature map in parallel."""
+    pdb_file_name = os.path.join(pdb_dir, pdb_name + ".pdb")
+    with open(pdb_file_name, "r") as f:
+        contacts, xx = pdb_to_cm_and_ajs(f, distance)
+
+    # Prepare the feature.
+    x_p = np.zeros((len(xx), all_for_assign.shape[1]))
+    for j in range(len(xx)):
+        idx = PROTEIN_2_IDX_TABLE.get(xx[j])
+        if idx is not None:
+            x_p[j] = all_for_assign[idx, :]
+
+    return contacts, x_p
+
+
 def compute_adj_and_feature_lists(pdbs, distance, f_assign, pdb_dir):
+    """Compute adjency matrix and feature map for each PDB in input."""
     # Read all the pdb files and extract interactions.
     print("  [DEBUG] Computing concat maps and adjacency lists.")
 
@@ -80,21 +98,14 @@ def compute_adj_and_feature_lists(pdbs, distance, f_assign, pdb_dir):
 
     adj_list     = []
     feature_list = []
-    for pdb in tqdm(pdbs):
-        pdb_file_name = os.path.join(pdb_dir, pdb + ".pdb")
-        with open(pdb_file_name, "r") as f:
-            contacts, xx = pdb_to_cm_and_ajs(f, distance)
 
-        adj_list.append(contacts)
+    f = partial(_compute_worker, all_for_assign, pdb_dir, distance)
 
-        # Prepare the feature.
-        x_p = np.zeros((len(xx), all_for_assign.shape[1]))
-        for j in range(len(xx)):
-            idx = PROTEIN_2_IDX_TABLE.get(xx[j])
-            if idx is not None:
-                x_p[j] = all_for_assign[idx, :]
-
-        feature_list.append(x_p)
+    with Pool() as pool:
+        result = pool.imap(f, pdbs, chunksize=64)
+        for (contacts, x_p) in tqdm(result, total=len(pdbs)):
+            adj_list.append(contacts)
+            feature_list.append(x_p)
 
     return adj_list, feature_list
 

@@ -10,6 +10,7 @@ from gnn_models_sag import ppi_model
 from utils import Metrictor_PPI, print_file
 from tensorboardX import SummaryWriter
 from utils import multi2big_x, multi2big_batch, multi2big_edge
+from tqdm import tqdm
 
 
 parser = argparse.ArgumentParser(description='HIGH-PPI_model_training')
@@ -45,8 +46,7 @@ def train(batch, p_x_all, p_edge_all, model, graph, ppi_list, loss_fn, optimizer
     global_best_valid_f1       = 0.0
     global_best_valid_f1_epoch = 0
 
-    for epoch in range(epochs):
-
+    for epoch in tqdm(range(epochs)):
         recall_sum    = 0.0
         precision_sum = 0.0
         f1_sum        = 0.0
@@ -179,31 +179,40 @@ def train(batch, p_x_all, p_edge_all, model, graph, ppi_list, loss_fn, optimizer
 
 def main():
     args = parser.parse_args()
+
+    print("  [DEBUG] Reading the network")
     ppi_data = GNN_DATA(ppi_path=args.ppi_path)
     ppi_data.get_feature_origin(pseq_path=args.pseq_path,
                                 vec_path=args.vec_path)
 
+    print("  [DEBUG] Generating the data")
     ppi_data.generate_data()
-    ppi_data.split_dataset(train_valid_index_path='./train_val_split_data/train_val_split_1.json', random_new=True,
-                           mode=args.split)
+    print("  [DEBUG] Splitting the dataset")
+    ppi_data.split_dataset(
+        train_valid_index_path='./train_val_split_data/train_val_split_1.json',
+        random_new=True,
+        mode=args.split,
+    )
     graph = ppi_data.data
     ppi_list = ppi_data.ppi_list
 
     graph.train_mask = ppi_data.ppi_split_dict['train_index']
     graph.val_mask = ppi_data.ppi_split_dict['valid_index']
 
+    print("  [DEBUG] Loading adj and feature matrices")
     p_x_all    = torch.load(args.p_feat_matrix)
     p_edge_all = np.load(args.p_adj_matrix, allow_pickle=True)
 
+    print("  [DEBUG] Generating the batch")
     p_x_all, x_num_index = multi2big_x(p_x_all)
     p_edge_all, _ = multi2big_edge(p_edge_all, x_num_index)
     p_edge_all = p_edge_all - 1  # @NOTE: avoid off-by-one error
 
-
-    batch = multi2big_batch(x_num_index)+1
+    batch = multi2big_batch(x_num_index) + 1
 
     print("train gnn, train_num: {}, valid_num: {}".format(len(graph.train_mask), len(graph.val_mask)))
 
+    print("  [DEBUG] Enriching graph variables")
     graph.edge_index_got = torch.cat(
         (graph.edge_index[:, graph.train_mask], graph.edge_index[:, graph.train_mask][[1, 0]]), dim=1)
     graph.edge_attr_got = torch.cat((graph.edge_attr_1[graph.train_mask], graph.edge_attr_1[graph.train_mask]), dim=0)
@@ -214,6 +223,7 @@ def main():
 
     graph.to(device)
 
+    print("  [DEBUG] Creating the model")
     model = ppi_model(
         class_num=p_x_all.shape[1],
         bgnn_hidden_size=128,
@@ -238,14 +248,27 @@ def main():
 
     summary_writer = SummaryWriter(save_path)
 
+    print("  [DEBUG] Training...")
     # @NOTE: the batch size from the paper is 128
-    train(batch, p_x_all, p_edge_all, model, graph, ppi_list, loss_fn, optimizer, device,
-          result_file_path, summary_writer, save_path,
-          batch_size=11000, epochs=args.epoch_num, scheduler=scheduler,
+    train(batch,
+          p_x_all,
+          p_edge_all,
+          model,
+          graph,
+          ppi_list,
+          loss_fn,
+          optimizer,
+          device,
+          result_file_path,
+          summary_writer,
+          save_path,
+          batch_size=11000,
+          epochs=args.epoch_num,
+          scheduler=scheduler,
           got=True)
 
     summary_writer.close()
 
 
 if __name__ == "__main__":
-    main()
+        main()

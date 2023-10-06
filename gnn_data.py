@@ -11,6 +11,20 @@ from torch_geometric.data import Data
 
 
 class GNN_DATA:
+
+    # The type of the edge. Recall that we're in a edge type prediction problem.
+    CLASS_MAP = {
+        'reaction': 0,
+        'binding': 1,
+        'ptmod': 2,
+        'activation': 3,
+        'inhibition': 4,
+        'catalysis': 5,
+        'expression': 6,
+        'negative': 7,  # @NOTE: trick to enable link prediction problem...
+    }
+
+
     def __init__(self, ppi_path, exclude_protein_path=None, max_len=2000, skip_head=True, p1_index=0, p2_index=1,
                  label_index=2, graph_undirection=True, bigger_ppi_path=None):
         self.ppi_list = []
@@ -22,20 +36,18 @@ class GNN_DATA:
         self.bigger_ppi_path = bigger_ppi_path
         self.max_len = max_len
 
-        name = 0
+        name     = 0
         ppi_name = 0
+
         self.node_num = 0
         self.edge_num = 0
+
         if exclude_protein_path is not None:
             with open(exclude_protein_path, 'r') as f:
                 ex_protein = json.load(f)
-                f.close()
             ex_protein = {p: i for i, p in enumerate(ex_protein)}
         else:
             ex_protein = {}
-
-        class_map = {'reaction': 0, 'binding': 1, 'ptmod': 2, 'activation': 3, 'inhibition': 4, 'catalysis': 5,
-                     'expression': 6}
 
         for line in tqdm(open(ppi_path)):
             if skip_head:
@@ -63,14 +75,16 @@ class GNN_DATA:
 
             if temp_data not in self.ppi_dict.keys():
                 self.ppi_dict[temp_data] = ppi_name
-                temp_label = [0, 0, 0, 0, 0, 0, 0]  # @NOTE: same length as `class_map`...
-                temp_label[class_map[line[label_index]]] = 1
+                temp_label = [0 for _ in range(len(self.CLASS_MAP))]
+                mode = line[label_index]
+                temp_label[self.CLASS_MAP[mode]] = 1
                 self.ppi_label_list.append(temp_label)
                 ppi_name += 1
             else:
                 index = self.ppi_dict[temp_data]
                 temp_label = self.ppi_label_list[index]
-                temp_label[class_map[line[label_index]]] = 1
+                mode = line[label_index]
+                temp_label[self.CLASS_MAP[mode]] = 1
                 self.ppi_label_list[index] = temp_label
 
         if bigger_ppi_path is not None:
@@ -98,13 +112,13 @@ class GNN_DATA:
                 if temp_data not in self.ppi_dict.keys():
                     self.ppi_dict[temp_data] = ppi_name
                     temp_label = [0, 0, 0, 0, 0, 0, 0]
-                    temp_label[class_map[line[label_index]]] = 1
+                    temp_label[self.CLASS_MAP[line[label_index]]] = 1
                     self.ppi_label_list.append(temp_label)
                     ppi_name += 1
                 else:
                     index = self.ppi_dict[temp_data]
                     temp_label = self.ppi_label_list[index]
-                    temp_label[class_map[line[label_index]]] = 1
+                    temp_label[self.CLASS_MAP[line[label_index]]] = 1
                     self.ppi_label_list[index] = temp_label
 
         i = 0
@@ -273,6 +287,9 @@ class GNN_DATA:
                     f.write(jsobj)
 
             elif mode == "test":
+                # Use this mode to run test. This creates a shuffle edge list
+                # with all nodes and edges from current graph.
+
                 ppi_num = int(self.edge_num // 2)
                 random_list = [i for i in range(ppi_num)]
                 random.shuffle(random_list)
